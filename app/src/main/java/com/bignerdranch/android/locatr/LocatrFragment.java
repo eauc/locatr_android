@@ -2,6 +2,10 @@ package com.bignerdranch.android.locatr;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.location.Location;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Looper;
 import android.support.annotation.NonNull;
@@ -22,6 +26,9 @@ import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
+
+import java.io.IOException;
+import java.util.List;
 
 public class LocatrFragment extends Fragment {
     private static final String TAG = "LOCATR_FRAG";
@@ -130,6 +137,7 @@ public class LocatrFragment extends Fragment {
                     @Override
                     public void onLocationResult(LocationResult locationResult) {
                         Log.i(TAG, "Got a fix: " + locationResult.getLastLocation());
+                        new SearchTask().execute(locationResult.getLastLocation());
                     }
                 }, Looper.myLooper());
     }
@@ -138,5 +146,32 @@ public class LocatrFragment extends Fragment {
         int result = ContextCompat
                 .checkSelfPermission(getActivity(), LOCATION_PERMISSIONS[0]);
         return result == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private class SearchTask extends AsyncTask<Location,Void,Void> {
+        private GalleryItem mGalleryItem;
+        private Bitmap mBitmap;
+
+        @Override
+        protected Void doInBackground(Location... locations) {
+            FlickrFetchr fetchr = new FlickrFetchr();
+            List<GalleryItem> items = fetchr.searchPhotos(locations[0], 0);
+            if(items.size() == 0) {
+                return null;
+            }
+            mGalleryItem = items.get(0);
+            try {
+                byte[] bytes = fetchr.getUrlBytes(mGalleryItem.getUrl());
+                mBitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+            } catch (IOException e) {
+                Log.e(TAG, "Unable to download bitmap", e);
+            }
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(Void aVoid) {
+            mImageView.setImageBitmap(mBitmap);
+        }
     }
 }
